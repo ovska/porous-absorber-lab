@@ -6,6 +6,9 @@ from 20 Hz to 20 kHz.
 Open `index.html` in a browser. Plotly is loaded from the CDN for hover labels,
 legend interaction, pan, and zoom.
 
+Sliders snap over focused working ranges, while the numeric fields can hold
+values outside those slider ranges.
+
 The calculator uses the Allard & Champoux (1992) empirical characteristic
 impedance and propagation constant form:
 

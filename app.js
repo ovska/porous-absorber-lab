@@ -12,27 +12,30 @@ const PARAMS = {
     label: "Absorber thickness",
     shortLabel: "Thickness",
     unit: "mm",
-    min: 1,
-    max: 1000,
-    step: 1,
+    sliderMin: 50,
+    sliderMax: 1000,
+    sliderStep: 10,
+    fieldMin: 1,
     defaultValue: 100,
   },
   flowResistivity: {
     label: "Flow resistivity",
     shortLabel: "Flow resistivity",
     unit: "Pa.s/m^2",
-    min: 1000,
-    max: 500000,
-    step: 500,
+    sliderMin: 5000,
+    sliderMax: 25000,
+    sliderStep: 1000,
+    fieldMin: 1,
     defaultValue: 10000,
   },
   airGap: {
     label: "Air gap",
     shortLabel: "Air gap",
     unit: "mm",
-    min: 0,
-    max: 1000,
-    step: 1,
+    sliderMin: 0,
+    sliderMax: 500,
+    sliderStep: 10,
+    fieldMin: 0,
     defaultValue: 0,
   },
 };
@@ -355,6 +358,7 @@ function renderAbsorberCard(absorber, index) {
   const controls = Object.entries(PARAMS)
     .map(([key, meta]) => {
       const value = absorber[key];
+      const sliderValue = sliderValueForParam(key, value);
       return `
         <label class="slider-field" data-param="${key}">
           <span class="slider-label">
@@ -364,19 +368,18 @@ function renderAbsorberCard(absorber, index) {
           <span class="slider-control-row">
             <input
               type="range"
-              min="${meta.min}"
-              max="${meta.max}"
-              step="${meta.step}"
-              value="${value}"
+              min="${meta.sliderMin}"
+              max="${meta.sliderMax}"
+              step="${meta.sliderStep}"
+              value="${sliderValue}"
               data-action="range"
               data-param="${key}"
               aria-label="${escapeHtml(meta.label)}"
             >
             <input
               type="number"
-              min="${meta.min}"
-              max="${meta.max}"
-              step="${meta.step}"
+              min="${meta.fieldMin}"
+              step="any"
               value="${value}"
               data-action="number"
               data-param="${key}"
@@ -400,7 +403,7 @@ function renderAbsorberCard(absorber, index) {
           </label>
         </div>
         <div class="absorber-actions">
-          <button class="quiet-button" type="button" data-action="duplicate">Copy graph</button>
+          <button class="quiet-button" type="button" data-action="duplicate">Duplicate</button>
           <button class="danger-button" type="button" data-action="remove">Remove</button>
         </div>
       </header>
@@ -454,7 +457,8 @@ function bindAbsorberCard(card, absorberId) {
     input.addEventListener("focus", startPendingChange);
     input.addEventListener("input", (event) => {
       const parameter = event.target.dataset.param;
-      const value = clampToParam(parameter, event.target.value);
+      const value = valueFromControl(parameter, event.target);
+      if (value === null) return;
       mutateLive(() => {
         findAbsorber(absorberId)[parameter] = value;
       });
@@ -472,8 +476,10 @@ function syncCardParameter(card, parameter, value) {
   if (!field) return;
   field.querySelector("strong").textContent = `${formatNumber(value)} ${meta.unit}`;
   field.querySelectorAll("input").forEach((input) => {
-    if (Number(input.value) !== value) {
-      input.value = value;
+    const nextValue =
+      input.dataset.action === "range" ? sliderValueForParam(parameter, value) : value;
+    if (Number(input.value) !== nextValue) {
+      input.value = nextValue;
     }
   });
 }
@@ -690,7 +696,31 @@ function logSpace(min, max, count) {
 function clampToParam(parameter, value) {
   const meta = PARAMS[parameter];
   const number = numberOrDefault(value, meta.defaultValue);
-  return Math.min(meta.max, Math.max(meta.min, roundToStep(number, meta.step)));
+  return Math.max(meta.fieldMin, number);
+}
+
+function valueFromControl(parameter, input) {
+  if (input.dataset.action === "range") {
+    return sliderValueForParam(parameter, input.value);
+  }
+
+  if (input.value === "") {
+    return null;
+  }
+
+  const number = Number(input.value);
+  if (!Number.isFinite(number)) {
+    return null;
+  }
+
+  return clampToParam(parameter, number);
+}
+
+function sliderValueForParam(parameter, value) {
+  const meta = PARAMS[parameter];
+  const number = numberOrDefault(value, meta.defaultValue);
+  const bounded = Math.min(meta.sliderMax, Math.max(meta.sliderMin, number));
+  return roundToStep(bounded, meta.sliderStep);
 }
 
 function roundToStep(value, step) {
