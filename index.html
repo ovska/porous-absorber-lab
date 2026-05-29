@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Porous Absorber Efficiency Lab</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Allard &amp; Champoux 1992</p>
+          <h1>Porous Absorber Efficiency Lab</h1>
+        </div>
+        <div class="top-actions" aria-label="Global controls">
+          <label class="switch-control">
+            <input id="randomIncidence" type="checkbox">
+            <span class="switch-track" aria-hidden="true"></span>
+            <span>Random incidence</span>
+          </label>
+          <button id="undoButton" class="icon-button" type="button" title="Undo">Undo</button>
+          <button id="addAbsorberButton" class="primary-button" type="button">Add absorber</button>
+        </div>
+      </header>
+
+      <section class="command-row" aria-label="Copy slider value">
+        <label>
+          <span>Copy</span>
+          <select id="copyParameter"></select>
+        </label>
+        <label>
+          <span>from</span>
+          <select id="copySource"></select>
+        </label>
+        <button id="applyToVisibleButton" class="secondary-button" type="button">Apply to visible</button>
+      </section>
+
+      <section class="workspace">
+        <section class="chart-panel" aria-label="Absorber chart">
+          <div id="chart"></div>
+          <div id="chartStatus" class="chart-status" role="status"></div>
+        </section>
+
+        <aside class="control-panel" aria-label="Absorber controls">
+          <div class="panel-heading">
+            <h2>Absorbers</h2>
+            <span id="absorberCount"></span>
+          </div>
+          <div id="absorberList" class="absorber-list"></div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>
