@@ -13,10 +13,10 @@ const AIR = {
 };
 
 const ROOM_DIMENSION_RANGE = {
-  min: 2000,
-  max: 5000,
-  step: 10,
-  fallback: 3000,
+  min: 200,
+  max: 500,
+  step: 1,
+  fallback: 300,
 };
 
 const ROOM_DIMENSIONS = {
@@ -106,6 +106,7 @@ function cacheElements() {
   els.copySource = document.querySelector("#copySource");
   els.optimizeFrequencyRange = document.querySelector("#optimizeFrequencyRange");
   els.optimizeFrequencyInput = document.querySelector("#optimizeFrequencyInput");
+  els.optimizerLineVisible = document.querySelector("#optimizerLineVisible");
   els.optimizeButtons = document.querySelectorAll("[data-optimize-param]");
   els.roomModeOrder = document.querySelector("#roomModeOrder");
   els.roomDimensionList = document.querySelector("#roomDimensionList");
@@ -169,7 +170,12 @@ function bindGlobalControls() {
     });
   });
 
+  els.optimizeFrequencyRange.addEventListener("pointerdown", () => {
+    enableOptimizerLine();
+  });
+
   els.optimizeFrequencyRange.addEventListener("input", (event) => {
+    enableOptimizerLine();
     setOptimizeFrequency(frequencyFromSliderPosition(event.target.value));
   });
 
@@ -186,6 +192,13 @@ function bindGlobalControls() {
     button.addEventListener("click", () => {
       optimizeVisibleAbsorbers(button.dataset.optimizeParam);
     });
+  });
+
+  els.optimizerLineVisible.addEventListener("change", (event) => {
+    state.showOptimizerLine = event.target.value === "true";
+    saveState();
+    syncStaticControls();
+    renderChart();
   });
 
   els.roomModeOrder.addEventListener("change", (event) => {
@@ -230,12 +243,18 @@ function createDefaultState() {
     copyParameter: "thickness",
     copySourceId: null,
     optimizeFrequency: FREQUENCY_OPTIMIZER.defaultValue,
+    showOptimizerLine: false,
     roomModes: {
       order: 0,
       dimensions: {
         width: null,
         depth: null,
         height: null,
+      },
+      visible: {
+        width: true,
+        depth: true,
+        height: true,
       },
     },
     absorbers: [
@@ -312,6 +331,7 @@ function normalizeState(candidate) {
     copyParameter: PARAMS[candidate?.copyParameter] ? candidate.copyParameter : "thickness",
     copySourceId: candidate?.copySourceId ?? absorbers[0]?.id ?? null,
     optimizeFrequency: clampFrequency(candidate?.optimizeFrequency),
+    showOptimizerLine: candidate?.showOptimizerLine === true,
     roomModes: normalizeRoomModes(candidate?.roomModes),
     absorbers,
   };
@@ -331,7 +351,9 @@ function commit(mutator) {
     pushHistory(snapshot);
     saveState();
     render();
+    return true;
   }
+  return false;
 }
 
 function startPendingChange() {
@@ -389,6 +411,7 @@ function syncStaticControls() {
   els.copyParameter.value = state.copyParameter;
   els.optimizeFrequencyRange.value = sliderPositionFromFrequency(state.optimizeFrequency);
   els.optimizeFrequencyInput.value = Math.round(state.optimizeFrequency);
+  els.optimizerLineVisible.value = String(state.showOptimizerLine);
   els.roomModeOrder.value = String(state.roomModes.order);
 }
 
@@ -433,6 +456,14 @@ function setOptimizeFrequencyIfValid(value) {
   renderChart();
 }
 
+function enableOptimizerLine() {
+  if (state.showOptimizerLine) return;
+  state.showOptimizerLine = true;
+  saveState();
+  syncStaticControls();
+  renderChart();
+}
+
 function optimizeVisibleAbsorbers(parameter) {
   if (!PARAMS[parameter]) return;
 
@@ -440,6 +471,7 @@ function optimizeVisibleAbsorbers(parameter) {
   if (!visibleAbsorbers.length) return;
 
   commit(() => {
+    state.showOptimizerLine = true;
     state.optimizeFrequency = clampFrequency(els.optimizeFrequencyInput.value);
     state.absorbers.forEach((absorber) => {
       if (absorber.visible) {
@@ -478,13 +510,20 @@ function renderRoomDimensionList() {
   els.roomDimensionList.innerHTML = Object.entries(ROOM_DIMENSIONS)
     .map(([key, meta]) => {
       const value = state.roomModes.dimensions[key];
+      const isVisible = state.roomModes.visible[key];
       const sliderValue = roomSliderValue(value);
       return `
-        <label class="room-dimension-field" data-room-dimension="${key}">
-          <span class="room-dimension-label">
+        <div class="room-dimension-field" data-room-dimension="${key}" data-visible="${isVisible}">
+          <button
+            class="room-dimension-toggle"
+            type="button"
+            data-room-toggle="${key}"
+            aria-pressed="${isVisible}"
+            title="Toggle ${meta.label} room-mode lines"
+          >
             <span class="room-swatch" style="background: ${meta.color}" aria-hidden="true"></span>
-            <span>${meta.label}</span>
-          </span>
+            <span>${meta.label} (cm)</span>
+          </button>
           <span class="room-dimension-controls">
             <input
               type="range"
@@ -494,27 +533,42 @@ function renderRoomDimensionList() {
               value="${sliderValue}"
               data-room-action="range"
               data-room-dimension="${key}"
-              aria-label="${meta.label} room dimension"
+              aria-label="${meta.label} room dimension in centimeters"
             >
             <input
               type="number"
-              min="1"
+              min="${ROOM_DIMENSION_RANGE.min}"
+              max="${ROOM_DIMENSION_RANGE.max}"
               step="${ROOM_DIMENSION_RANGE.step}"
               value="${value ?? ""}"
               data-room-action="number"
               data-room-dimension="${key}"
               inputmode="numeric"
-              aria-label="${meta.label} room dimension value"
+              aria-label="${meta.label} room dimension value in centimeters"
             >
           </span>
-        </label>
+        </div>
       `;
     })
     .join("");
 
   els.roomDimensionList
+    .querySelectorAll("[data-room-toggle]")
+    .forEach((button) => bindRoomDimensionToggle(button));
+
+  els.roomDimensionList
     .querySelectorAll("[data-room-action]")
     .forEach((input) => bindRoomDimensionControl(input));
+}
+
+function bindRoomDimensionToggle(button) {
+  button.addEventListener("click", () => {
+    const dimension = button.dataset.roomToggle;
+    state.roomModes.visible[dimension] = !state.roomModes.visible[dimension];
+    saveState();
+    syncRoomDimensionVisibility(dimension);
+    renderChart();
+  });
 }
 
 function bindRoomDimensionControl(input) {
@@ -535,6 +589,15 @@ function bindRoomDimensionControl(input) {
     syncRoomDimensionControl(dimension, value);
     renderChart();
   });
+}
+
+function syncRoomDimensionVisibility(dimension) {
+  const field = els.roomDimensionList.querySelector(`[data-room-dimension="${dimension}"]`);
+  if (!field) return;
+
+  const isVisible = state.roomModes.visible[dimension];
+  field.dataset.visible = String(isVisible);
+  field.querySelector("[data-room-toggle]").setAttribute("aria-pressed", String(isVisible));
 }
 
 function syncRoomDimensionControl(dimension, value) {
@@ -978,12 +1041,18 @@ function sliderPositionFromFrequency(value) {
 
 function normalizeRoomModes(candidate) {
   const dimensions = candidate?.dimensions ?? {};
+  const visible = candidate?.visible ?? {};
   return {
     order: clampRoomModeOrder(candidate?.order),
     dimensions: {
-      width: normalizeRoomDimension(dimensions.width),
-      depth: normalizeRoomDimension(dimensions.depth),
-      height: normalizeRoomDimension(dimensions.height),
+      width: normalizeRoomDimension(dimensions.width, true),
+      depth: normalizeRoomDimension(dimensions.depth, true),
+      height: normalizeRoomDimension(dimensions.height, true),
+    },
+    visible: {
+      width: visible.width !== false,
+      depth: visible.depth !== false,
+      height: visible.height !== false,
     },
   };
 }
@@ -994,11 +1063,13 @@ function clampRoomModeOrder(value) {
   return Math.min(3, Math.max(0, Math.round(number)));
 }
 
-function normalizeRoomDimension(value) {
+function normalizeRoomDimension(value, migrateMillimeters = false) {
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   if (!Number.isFinite(number) || number <= 0) return null;
-  return roundToStep(number, ROOM_DIMENSION_RANGE.step);
+  const centimeters = migrateMillimeters && number > 1000 ? number / 10 : number;
+  const stepped = roundToStep(centimeters, ROOM_DIMENSION_RANGE.step);
+  return Math.min(ROOM_DIMENSION_RANGE.max, Math.max(ROOM_DIMENSION_RANGE.min, stepped));
 }
 
 function roomValueFromControl(input) {
@@ -1019,7 +1090,9 @@ function roomSliderValue(value) {
 }
 
 function chartOverlayShapes() {
-  return [optimizerLineShape(), ...roomModeLineShapes()].filter(Boolean);
+  return [state.showOptimizerLine ? optimizerLineShape() : null, ...roomModeLineShapes()].filter(
+    Boolean,
+  );
 }
 
 function optimizerLineShape() {
@@ -1044,12 +1117,12 @@ function roomModeLineShapes() {
   if (order === 0) return [];
 
   return Object.entries(ROOM_DIMENSIONS).flatMap(([dimension, meta]) => {
-    const lengthMillimeters = state.roomModes.dimensions[dimension];
-    if (!lengthMillimeters) return [];
+    const lengthCentimeters = state.roomModes.dimensions[dimension];
+    if (!lengthCentimeters || !state.roomModes.visible[dimension]) return [];
 
     return Array.from({ length: order }, (_, index) => {
       const modeOrder = index + 1;
-      const frequency = roomModeFrequency(lengthMillimeters, modeOrder);
+      const frequency = roomModeFrequency(lengthCentimeters, modeOrder);
       if (frequency < 20 || frequency > 20000) return null;
 
       return {
@@ -1062,16 +1135,16 @@ function roomModeLineShapes() {
         y1: 1 / (modeOrder + 1),
         line: {
           color: meta.color,
-          width: 1.5,
-          dash: "dash",
+          width: 2.25,
+          dash: "solid",
         },
       };
     }).filter(Boolean);
   });
 }
 
-function roomModeFrequency(lengthMillimeters, order) {
-  const lengthMeters = lengthMillimeters / 1000;
+function roomModeFrequency(lengthCentimeters, order) {
+  const lengthMeters = lengthCentimeters / 100;
   return (order * AIR.speed) / (2 * lengthMeters);
 }
 
