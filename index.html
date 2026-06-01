@@ -94,6 +94,7 @@
           id="optimizeFrequencyInput"
           class="frequency-input"
           type="number"
+          max="5000"
           step="1"
           inputmode="numeric"
           aria-label="Optimize frequency value"
@@ -137,6 +138,19 @@
               <span class="switch-track" aria-hidden="true"></span>
               <span>Random incidence</span>
             </label>
+            <label class="temperature-control">
+              <span>Air temp</span>
+              <input
+                id="airTemperature"
+                type="number"
+                min="-20"
+                max="40"
+                step="0.1"
+                inputmode="decimal"
+                aria-label="Air temperature in Celsius"
+              >
+              <span>°C</span>
+            </label>
             <div id="chartStatus" class="chart-status" role="status"></div>
           </div>
         </section>
@@ -149,6 +163,7 @@
             </div>
             <div class="panel-actions">
               <button id="undoButton" class="icon-button" type="button" title="Undo">Undo</button>
+              <select id="absorberPreset" aria-label="Absorber preset"></select>
               <button id="addAbsorberButton" class="primary-button" type="button">Add absorber</button>
             </div>
           </div>

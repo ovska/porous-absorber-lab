@@ -3,14 +3,102 @@ const HISTORY_LIMIT = 80;
 const THETA_LIMIT_RANDOM = (78 * Math.PI) / 180;
 const FREQUENCY_OPTIMIZER = {
   min: 20,
-  max: 16000,
+  max: 5000,
   defaultValue: 1000,
 };
 
-const AIR = {
-  density: 1.2041,
-  speed: 343.2,
+const CHART_FREQUENCY = {
+  min: 20,
+  defaultMax: 5000,
+  dataMax: 20000,
+  samples: 280,
 };
+
+const AIR = {
+  pressure: 101325,
+  gasConstant: 287.05,
+};
+
+const AIR_TEMPERATURE = {
+  min: -20,
+  max: 40,
+  defaultValue: 20,
+};
+
+const ABSORBER_PRESETS = [
+  {
+    id: "copy-last",
+    label: "Copy last settings",
+  },
+  {
+    id: "light-wool",
+    label: "Light wool (5k)",
+    name: "Light wool",
+    flowResistivity: 5000,
+  },
+  {
+    id: "glass-wool",
+    label: "Glass wool (8k)",
+    name: "Glass wool",
+    flowResistivity: 8000,
+  },
+  {
+    id: "mineral-wool",
+    label: "Mineral wool (10k)",
+    name: "Mineral wool",
+    flowResistivity: 10000,
+  },
+  {
+    id: "melamine-foam",
+    label: "Melamine foam (12k)",
+    name: "Melamine foam",
+    flowResistivity: 12000,
+  },
+  {
+    id: "dense-rockwool",
+    label: "Dense rockwool (30k)",
+    name: "Dense rockwool",
+    flowResistivity: 30000,
+  },
+];
+
+const DEFAULT_ABSORBER_PRESET_ID = ABSORBER_PRESETS[0].id;
+
+const ABSORBER_PRESET_BY_ID = Object.fromEntries(
+  ABSORBER_PRESETS.map((preset) => [preset.id, preset]),
+);
+
+const CHART_FREQUENCY_TICKS = [
+  20,
+  31.5,
+  63,
+  125,
+  250,
+  500,
+  1000,
+  2000,
+  4000,
+  5000,
+  8000,
+  16000,
+];
+
+const CHART_FREQUENCY_TICK_TEXT = [
+  "20",
+  "31.5",
+  "63",
+  "125",
+  "250",
+  "500",
+  "1k",
+  "2k",
+  "4k",
+  "5k",
+  "8k",
+  "16k",
+];
+
+const ROOM_MODE_FREQUENCY_MAX = 20000;
 
 const ROOM_DIMENSION_RANGE = {
   min: 200,
@@ -93,6 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
   bindGlobalControls();
   populateParameterSelect();
+  populateAbsorberPresetSelect();
   waitForPlotly();
   render();
 });
@@ -101,9 +190,11 @@ function cacheElements() {
   els.chart = document.querySelector("#chart");
   els.chartStatus = document.querySelector("#chartStatus");
   els.randomIncidence = document.querySelector("#randomIncidence");
+  els.airTemperature = document.querySelector("#airTemperature");
   els.darkMode = document.querySelector("#darkMode");
   els.undoButton = document.querySelector("#undoButton");
   els.addAbsorberButton = document.querySelector("#addAbsorberButton");
+  els.absorberPreset = document.querySelector("#absorberPreset");
   els.applyToVisibleButton = document.querySelector("#applyToVisibleButton");
   els.copyParameter = document.querySelector("#copyParameter");
   els.copySource = document.querySelector("#copySource");
@@ -124,6 +215,8 @@ function bindGlobalControls() {
       state.randomIncidence = els.randomIncidence.checked;
     });
   });
+
+  bindDeferredFieldCommit(els.airTemperature, commitAirTemperatureInput);
 
   els.darkMode.addEventListener("change", () => {
     state.theme = els.darkMode.checked ? "dark" : "light";
@@ -146,16 +239,30 @@ function bindGlobalControls() {
   els.addAbsorberButton.addEventListener("click", () => {
     commit(() => {
       const last = state.absorbers.at(-1);
+      const preset =
+        ABSORBER_PRESET_BY_ID[state.absorberPresetId] ??
+        ABSORBER_PRESET_BY_ID[DEFAULT_ABSORBER_PRESET_ID];
+      const usesMaterialPreset = Number.isFinite(preset.flowResistivity);
+      const absorberNumber = state.absorbers.length + 1;
       state.absorbers.push(
         createAbsorber({
-          name: `Absorber ${state.absorbers.length + 1}`,
+          name: usesMaterialPreset
+            ? `${preset.name} ${absorberNumber}`
+            : `Absorber ${absorberNumber}`,
           thickness: last?.thickness ?? PARAMS.thickness.defaultValue,
-          flowResistivity:
-            last?.flowResistivity ?? PARAMS.flowResistivity.defaultValue,
+          flowResistivity: usesMaterialPreset
+            ? preset.flowResistivity
+            : last?.flowResistivity ?? PARAMS.flowResistivity.defaultValue,
           airGap: last?.airGap ?? PARAMS.airGap.defaultValue,
         }),
       );
     });
+  });
+
+  els.absorberPreset.addEventListener("change", () => {
+    state.absorberPresetId = normalizeAbsorberPresetId(els.absorberPreset.value);
+    saveState();
+    syncStaticControls();
   });
 
   els.copyParameter.addEventListener("change", () => {
@@ -219,6 +326,12 @@ function populateParameterSelect() {
     .join("");
 }
 
+function populateAbsorberPresetSelect() {
+  els.absorberPreset.innerHTML = ABSORBER_PRESETS.map(
+    (preset) => `<option value="${preset.id}">${escapeHtml(preset.label)}</option>`,
+  ).join("");
+}
+
 function waitForPlotly() {
   if (window.Plotly) {
     plotReady = true;
@@ -244,7 +357,9 @@ function waitForPlotly() {
 function createDefaultState() {
   return {
     randomIncidence: false,
+    airTemperatureC: AIR_TEMPERATURE.defaultValue,
     theme: "light",
+    absorberPresetId: DEFAULT_ABSORBER_PRESET_ID,
     copyParameter: "thickness",
     copySourceId: null,
     optimizeFrequency: FREQUENCY_OPTIMIZER.defaultValue,
@@ -333,7 +448,9 @@ function normalizeState(candidate) {
 
   const normalized = {
     randomIncidence: Boolean(candidate?.randomIncidence),
+    airTemperatureC: clampAirTemperature(candidate?.airTemperatureC),
     theme: candidate?.theme === "dark" ? "dark" : "light",
+    absorberPresetId: normalizeAbsorberPresetId(candidate?.absorberPresetId),
     copyParameter: PARAMS[candidate?.copyParameter] ? candidate.copyParameter : "thickness",
     copySourceId: candidate?.copySourceId ?? absorbers[0]?.id ?? null,
     optimizeFrequency: clampFrequency(candidate?.optimizeFrequency),
@@ -414,8 +531,10 @@ function render() {
 
 function syncStaticControls() {
   els.randomIncidence.checked = state.randomIncidence;
+  els.airTemperature.value = formatTemperatureInput(state.airTemperatureC);
   els.darkMode.checked = state.theme === "dark";
   els.undoButton.disabled = history.length === 0;
+  els.absorberPreset.value = state.absorberPresetId;
   els.copyParameter.value = state.copyParameter;
   els.optimizeFrequencyRange.value = sliderPositionFromFrequency(state.optimizeFrequency);
   els.optimizeFrequencyInput.value = Math.round(state.optimizeFrequency);
@@ -472,6 +591,19 @@ function setOptimizeFrequency(value) {
   renderChart();
 }
 
+function commitAirTemperatureInput() {
+  if (els.airTemperature.value === "") {
+    syncStaticControls();
+    return;
+  }
+
+  const nextTemperature = clampAirTemperature(els.airTemperature.value);
+  state.airTemperatureC = nextTemperature;
+  saveState();
+  syncStaticControls();
+  renderChart();
+}
+
 function enableOptimizerLine() {
   if (state.showOptimizerLine) return;
   state.showOptimizerLine = true;
@@ -495,6 +627,7 @@ function optimizeVisibleAbsorbers(parameter) {
   const visibleAbsorbers = state.absorbers.filter((absorber) => absorber.visible);
   if (!visibleAbsorbers.length) return;
 
+  const air = airProperties();
   commit(() => {
     state.showOptimizerLine = true;
     state.optimizeFrequency = clampFrequency(els.optimizeFrequencyInput.value);
@@ -505,6 +638,7 @@ function optimizeVisibleAbsorbers(parameter) {
           parameter,
           state.optimizeFrequency,
           state.randomIncidence,
+          air,
         );
       }
     });
@@ -792,10 +926,15 @@ function renderChart() {
     return;
   }
 
-  const frequencies = logSpace(20, 20000, 280);
+  const air = airProperties();
+  const frequencies = logSpace(
+    CHART_FREQUENCY.min,
+    CHART_FREQUENCY.dataMax,
+    CHART_FREQUENCY.samples,
+  );
   const traces = visibleAbsorbers.map((absorber, index) => {
     const absorption = frequencies.map((frequency) =>
-      absorptionCoefficient(frequency, absorber, state.randomIncidence),
+      absorptionCoefficient(frequency, absorber, state.randomIncidence, air),
     );
     return {
       x: frequencies,
@@ -844,9 +983,12 @@ function chartLayout(emptyTitle = "") {
     xaxis: {
       title: "Frequency (Hz)",
       type: "log",
-      range: [Math.log10(20), Math.log10(20000)],
-      tickvals: [20, 31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-      ticktext: ["20", "31.5", "63", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"],
+      range: [
+        Math.log10(CHART_FREQUENCY.min),
+        Math.log10(CHART_FREQUENCY.defaultMax),
+      ],
+      tickvals: CHART_FREQUENCY_TICKS,
+      ticktext: CHART_FREQUENCY_TICK_TEXT,
       gridcolor: theme.grid,
       zeroline: false,
     },
@@ -894,9 +1036,9 @@ function chartConfig() {
   };
 }
 
-function absorptionCoefficient(frequency, absorber, randomIncidence) {
+function absorptionCoefficient(frequency, absorber, randomIncidence, air = airProperties()) {
   if (!randomIncidence) {
-    return clamp01(absorptionAtAngle(frequency, absorber, 0));
+    return clamp01(absorptionAtAngle(frequency, absorber, 0, air));
   }
 
   const samples = 36;
@@ -907,21 +1049,21 @@ function absorptionCoefficient(frequency, absorber, randomIncidence) {
   for (let index = 0; index < samples; index += 1) {
     const theta = (index + 0.5) * dTheta;
     const weight = 2 * Math.sin(theta) * Math.cos(theta) * dTheta;
-    weighted += absorptionAtAngle(frequency, absorber, theta) * weight;
+    weighted += absorptionAtAngle(frequency, absorber, theta, air) * weight;
     totalWeight += weight;
   }
 
   return clamp01(weighted / totalWeight);
 }
 
-function absorptionAtAngle(frequency, absorber, theta) {
+function absorptionAtAngle(frequency, absorber, theta, air) {
   const omega = 2 * Math.PI * frequency;
-  const z0 = AIR.density * AIR.speed;
-  const k0 = omega / AIR.speed;
+  const z0 = air.density * air.speed;
+  const k0 = omega / air.speed;
   const sinTheta = Math.sin(theta);
   const cosTheta = Math.max(Math.cos(theta), 1e-5);
 
-  const { zc, kc } = allardChampouxLayer(frequency, absorber.flowResistivity);
+  const { zc, kc } = allardChampouxLayer(frequency, absorber.flowResistivity, air);
   const transverse = k0 * sinTheta;
   const kxPorous = keepForwardRoot(csqrt(csub(cmul(kc, kc), c(transverse * transverse))));
   const znPorous = cdiv(cmul(zc, kc), kxPorous);
@@ -948,10 +1090,10 @@ function absorptionAtAngle(frequency, absorber, theta) {
   return 1 - cabs2(reflection);
 }
 
-function allardChampouxLayer(frequency, flowResistivity) {
-  const x = Math.max((AIR.density * frequency) / flowResistivity, 1e-9);
-  const z0 = AIR.density * AIR.speed;
-  const k0 = (2 * Math.PI * frequency) / AIR.speed;
+function allardChampouxLayer(frequency, flowResistivity, air) {
+  const x = Math.max((air.density * frequency) / flowResistivity, 1e-9);
+  const z0 = air.density * air.speed;
+  const k0 = (2 * Math.PI * frequency) / air.speed;
 
   return {
     zc: c(
@@ -1040,6 +1182,30 @@ function valueFromControl(parameter, input) {
   return clampToParam(parameter, number);
 }
 
+function airProperties() {
+  const kelvin = state.airTemperatureC + 273.15;
+  return {
+    density: AIR.pressure / (AIR.gasConstant * kelvin),
+    speed: 331.3 * Math.sqrt(kelvin / 273.15),
+  };
+}
+
+function clampAirTemperature(value) {
+  const number = numberOrDefault(value, AIR_TEMPERATURE.defaultValue);
+  return roundToStep(
+    Math.min(AIR_TEMPERATURE.max, Math.max(AIR_TEMPERATURE.min, number)),
+    0.1,
+  );
+}
+
+function formatTemperatureInput(value) {
+  return Number(value).toFixed(1);
+}
+
+function normalizeAbsorberPresetId(value) {
+  return ABSORBER_PRESET_BY_ID[value] ? value : DEFAULT_ABSORBER_PRESET_ID;
+}
+
 function sliderValueForParam(parameter, value) {
   const meta = PARAMS[parameter];
   const number = numberOrDefault(value, meta.defaultValue);
@@ -1047,14 +1213,14 @@ function sliderValueForParam(parameter, value) {
   return roundToStep(bounded, meta.sliderStep);
 }
 
-function bestSliderValueForAbsorber(absorber, parameter, frequency, randomIncidence) {
+function bestSliderValueForAbsorber(absorber, parameter, frequency, randomIncidence, air) {
   const currentValue = absorber[parameter];
   let bestValue = sliderValueForParam(parameter, currentValue);
   let bestScore = -Infinity;
 
   sliderValuesForParam(parameter).forEach((value) => {
     const trial = { ...absorber, [parameter]: value };
-    const score = absorptionCoefficient(frequency, trial, randomIncidence);
+    const score = absorptionCoefficient(frequency, trial, randomIncidence, air);
     const isBetter = score > bestScore + 1e-9;
     const isTieCloser =
       Math.abs(score - bestScore) <= 1e-9 &&
@@ -1178,14 +1344,15 @@ function roomModeLineShapes() {
   const order = state.roomModes.order;
   if (order === 0) return [];
 
+  const air = airProperties();
   return Object.entries(ROOM_DIMENSIONS).flatMap(([dimension, meta]) => {
     const lengthCentimeters = state.roomModes.dimensions[dimension];
     if (!lengthCentimeters || !state.roomModes.visible[dimension]) return [];
 
     return Array.from({ length: order }, (_, index) => {
       const modeOrder = index + 1;
-      const frequency = roomModeFrequency(lengthCentimeters, modeOrder);
-      if (frequency < 20 || frequency > 20000) return null;
+      const frequency = roomModeFrequency(lengthCentimeters, modeOrder, air);
+      if (frequency < CHART_FREQUENCY.min || frequency > ROOM_MODE_FREQUENCY_MAX) return null;
 
       return {
         type: "line",
@@ -1205,9 +1372,9 @@ function roomModeLineShapes() {
   });
 }
 
-function roomModeFrequency(lengthCentimeters, order) {
+function roomModeFrequency(lengthCentimeters, order, air) {
   const lengthMeters = lengthCentimeters / 100;
-  return (order * AIR.speed) / (2 * lengthMeters);
+  return (order * air.speed) / (2 * lengthMeters);
 }
 
 function roundToStep(value, step) {
