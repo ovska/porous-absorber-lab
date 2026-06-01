@@ -27,10 +27,6 @@ const AIR_TEMPERATURE = {
 
 const ABSORBER_PRESETS = [
   {
-    id: "copy-last",
-    label: "Copy last settings",
-  },
-  {
     id: "light-wool",
     label: "Light wool (5k)",
     name: "Light wool",
@@ -62,7 +58,7 @@ const ABSORBER_PRESETS = [
   },
 ];
 
-const DEFAULT_ABSORBER_PRESET_ID = ABSORBER_PRESETS[0].id;
+const DEFAULT_ABSORBER_PRESET_ID = "mineral-wool";
 
 const ABSORBER_PRESET_BY_ID = Object.fromEntries(
   ABSORBER_PRESETS.map((preset) => [preset.id, preset]),
@@ -172,6 +168,7 @@ let state = loadState();
 let history = [];
 let pendingSnapshot = null;
 let plotReady = false;
+let chartRevision = 0;
 
 const els = {};
 
@@ -191,7 +188,9 @@ function cacheElements() {
   els.chartStatus = document.querySelector("#chartStatus");
   els.randomIncidence = document.querySelector("#randomIncidence");
   els.airTemperature = document.querySelector("#airTemperature");
+  els.resetAirTemperatureButton = document.querySelector("#resetAirTemperatureButton");
   els.darkMode = document.querySelector("#darkMode");
+  els.resetAllButton = document.querySelector("#resetAllButton");
   els.undoButton = document.querySelector("#undoButton");
   els.addAbsorberButton = document.querySelector("#addAbsorberButton");
   els.absorberPreset = document.querySelector("#absorberPreset");
@@ -217,6 +216,7 @@ function bindGlobalControls() {
   });
 
   bindDeferredFieldCommit(els.airTemperature, commitAirTemperatureInput);
+  els.resetAirTemperatureButton.addEventListener("click", resetAirTemperature);
 
   els.darkMode.addEventListener("change", () => {
     state.theme = els.darkMode.checked ? "dark" : "light";
@@ -226,6 +226,7 @@ function bindGlobalControls() {
   });
 
   els.undoButton.addEventListener("click", undo);
+  els.resetAllButton.addEventListener("click", resetAllState);
 
   document.addEventListener("keydown", (event) => {
     const isMacUndo = event.metaKey && event.key.toLowerCase() === "z";
@@ -281,9 +282,7 @@ function bindGlobalControls() {
     if (!source || !PARAMS[parameter]) return;
     commit(() => {
       state.absorbers.forEach((absorber) => {
-        if (absorber.visible) {
-          absorber[parameter] = source[parameter];
-        }
+        absorber[parameter] = source[parameter];
       });
     });
   });
@@ -301,7 +300,7 @@ function bindGlobalControls() {
 
   els.optimizeButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      optimizeVisibleAbsorbers(button.dataset.optimizeParam);
+      optimizeAbsorbers(button.dataset.optimizeParam);
     });
   });
 
@@ -358,7 +357,7 @@ function createDefaultState() {
   return {
     randomIncidence: false,
     airTemperatureC: AIR_TEMPERATURE.defaultValue,
-    theme: "light",
+    theme: preferredTheme(),
     absorberPresetId: DEFAULT_ABSORBER_PRESET_ID,
     copyParameter: "thickness",
     copySourceId: null,
@@ -407,7 +406,6 @@ function createAbsorber(overrides = {}) {
       PARAMS.flowResistivity.defaultValue,
     ),
     airGap: numberOrDefault(overrides.airGap, PARAMS.airGap.defaultValue),
-    visible: overrides.visible ?? true,
   };
 }
 
@@ -441,7 +439,6 @@ function normalizeState(candidate) {
           thickness: clampToParam("thickness", absorber.thickness),
           flowResistivity: clampToParam("flowResistivity", absorber.flowResistivity),
           airGap: clampToParam("airGap", absorber.airGap),
-          visible: absorber.visible !== false,
         }),
       )
     : fallback.absorbers;
@@ -449,7 +446,7 @@ function normalizeState(candidate) {
   const normalized = {
     randomIncidence: Boolean(candidate?.randomIncidence),
     airTemperatureC: clampAirTemperature(candidate?.airTemperatureC),
-    theme: candidate?.theme === "dark" ? "dark" : "light",
+    theme: normalizeTheme(candidate?.theme),
     absorberPresetId: normalizeAbsorberPresetId(candidate?.absorberPresetId),
     copyParameter: PARAMS[candidate?.copyParameter] ? candidate.copyParameter : "thickness",
     copySourceId: candidate?.copySourceId ?? absorbers[0]?.id ?? null,
@@ -521,6 +518,18 @@ function undo() {
   render();
 }
 
+function resetAllState() {
+  const snapshot = cloneState(state);
+  pendingSnapshot = null;
+  chartRevision += 1;
+  state = normalizeState(createDefaultState());
+  if (JSON.stringify(snapshot) !== JSON.stringify(state)) {
+    pushHistory(snapshot);
+  }
+  saveState();
+  render();
+}
+
 function render() {
   syncTheme();
   syncStaticControls();
@@ -556,6 +565,19 @@ function applyThemeAttribute() {
   }
 }
 
+function preferredTheme() {
+  return typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+function normalizeTheme(value) {
+  if (value === "dark" || value === "light") return value;
+  return preferredTheme();
+}
+
 function renderCopySourceOptions() {
   els.copySource.innerHTML = state.absorbers
     .map((absorber) => `<option value="${absorber.id}">${escapeHtml(absorber.name)}</option>`)
@@ -564,12 +586,11 @@ function renderCopySourceOptions() {
     state.copySourceId = state.absorbers[0]?.id ?? null;
   }
   els.copySource.value = state.copySourceId ?? "";
-  const hasVisible = state.absorbers.some((absorber) => absorber.visible);
   els.copySource.disabled = state.absorbers.length === 0;
   els.copyParameter.disabled = state.absorbers.length === 0;
-  els.applyToVisibleButton.disabled = !hasVisible || state.absorbers.length === 0;
+  els.applyToVisibleButton.disabled = state.absorbers.length === 0;
   els.optimizeButtons.forEach((button) => {
-    button.disabled = !hasVisible || state.absorbers.length === 0;
+    button.disabled = state.absorbers.length === 0;
   });
 }
 
@@ -604,6 +625,12 @@ function commitAirTemperatureInput() {
   renderChart();
 }
 
+function resetAirTemperature() {
+  commit(() => {
+    state.airTemperatureC = AIR_TEMPERATURE.defaultValue;
+  });
+}
+
 function enableOptimizerLine() {
   if (state.showOptimizerLine) return;
   state.showOptimizerLine = true;
@@ -621,26 +648,23 @@ function commitOptimizeFrequencyInput() {
   setOptimizeFrequency(els.optimizeFrequencyInput.value);
 }
 
-function optimizeVisibleAbsorbers(parameter) {
+function optimizeAbsorbers(parameter) {
   if (!PARAMS[parameter]) return;
 
-  const visibleAbsorbers = state.absorbers.filter((absorber) => absorber.visible);
-  if (!visibleAbsorbers.length) return;
+  if (!state.absorbers.length) return;
 
   const air = airProperties();
   commit(() => {
     state.showOptimizerLine = true;
     state.optimizeFrequency = clampFrequency(els.optimizeFrequencyInput.value);
     state.absorbers.forEach((absorber) => {
-      if (absorber.visible) {
-        absorber[parameter] = bestSliderValueForAbsorber(
-          absorber,
-          parameter,
-          state.optimizeFrequency,
-          state.randomIncidence,
-          air,
-        );
-      }
+      absorber[parameter] = bestSliderValueForAbsorber(
+        absorber,
+        parameter,
+        state.optimizeFrequency,
+        state.randomIncidence,
+        air,
+      );
     });
   });
 }
@@ -811,15 +835,11 @@ function renderAbsorberCard(absorber, index) {
     .join("");
 
   return `
-    <article class="absorber-card" data-absorber-id="${absorber.id}" data-visible="${absorber.visible}">
+    <article class="absorber-card" data-absorber-id="${absorber.id}">
       <header class="absorber-header">
         <span class="trace-swatch" style="background: ${color}" aria-hidden="true"></span>
         <div class="absorber-title-row">
           <input type="text" value="${escapeHtml(absorber.name)}" data-action="name" aria-label="Absorber name">
-          <label class="visible-check">
-            <input type="checkbox" data-action="visible" ${absorber.visible ? "checked" : ""}>
-            <span>Visible</span>
-          </label>
         </div>
         <div class="absorber-actions">
           <button class="quiet-button" type="button" data-action="duplicate">Duplicate</button>
@@ -838,12 +858,6 @@ function bindAbsorberCard(card, absorberId) {
   bindDeferredFieldCommit(nameInput, (event) => {
     commit(() => {
       findAbsorber(absorberId).name = event.target.value;
-    });
-  });
-
-  card.querySelector('[data-action="visible"]').addEventListener("change", (event) => {
-    commit(() => {
-      findAbsorber(absorberId).visible = event.target.checked;
     });
   });
 
@@ -919,10 +933,9 @@ function syncCardParameter(card, parameter, value) {
 function renderChart() {
   if (!els.chart || !plotReady) return;
 
-  const visibleAbsorbers = state.absorbers.filter((absorber) => absorber.visible);
-  if (!visibleAbsorbers.length) {
-    window.Plotly.react(els.chart, [], chartLayout("No visible absorbers"), chartConfig());
-    els.chartStatus.textContent = "No visible absorbers.";
+  if (!state.absorbers.length) {
+    window.Plotly.react(els.chart, [], chartLayout("No absorbers"), chartConfig());
+    els.chartStatus.textContent = "No absorbers.";
     return;
   }
 
@@ -932,7 +945,7 @@ function renderChart() {
     CHART_FREQUENCY.dataMax,
     CHART_FREQUENCY.samples,
   );
-  const traces = visibleAbsorbers.map((absorber, index) => {
+  const traces = state.absorbers.map((absorber) => {
     const absorption = frequencies.map((frequency) =>
       absorptionCoefficient(frequency, absorber, state.randomIncidence, air),
     );
@@ -1000,7 +1013,7 @@ function chartLayout(emptyTitle = "") {
       zeroline: false,
     },
     shapes: chartOverlayShapes(),
-    uirevision: "absorber-efficiency-lab",
+    uirevision: `absorber-efficiency-lab-${chartRevision}`,
   };
 }
 
@@ -1192,14 +1205,13 @@ function airProperties() {
 
 function clampAirTemperature(value) {
   const number = numberOrDefault(value, AIR_TEMPERATURE.defaultValue);
-  return roundToStep(
+  return Math.round(
     Math.min(AIR_TEMPERATURE.max, Math.max(AIR_TEMPERATURE.min, number)),
-    0.1,
   );
 }
 
 function formatTemperatureInput(value) {
-  return Number(value).toFixed(1);
+  return String(Math.round(Number(value)));
 }
 
 function normalizeAbsorberPresetId(value) {

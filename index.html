@@ -65,6 +65,7 @@
             <span class="switch-track" aria-hidden="true"></span>
             <span>Dark mode</span>
           </label>
+          <button id="resetAllButton" class="secondary-button" type="button">Reset all</button>
         </div>
       </header>
 
@@ -77,7 +78,7 @@
           <span>from</span>
           <select id="copySource"></select>
         </label>
-        <button id="applyToVisibleButton" class="secondary-button" type="button">Apply to visible</button>
+        <button id="applyToVisibleButton" class="secondary-button" type="button">Apply to all</button>
       </section>
 
       <section class="command-row optimize-row" aria-label="Optimize absorber parameter">
@@ -133,25 +134,30 @@
         <section class="chart-panel" aria-label="Absorber chart">
           <div id="chart"></div>
           <div class="chart-footer">
-            <label class="switch-control graph-incidence-control">
-              <input id="randomIncidence" type="checkbox">
-              <span class="switch-track" aria-hidden="true"></span>
-              <span>Random incidence</span>
-            </label>
-            <label class="temperature-control">
-              <span>Air temp</span>
-              <input
-                id="airTemperature"
-                type="number"
-                min="-20"
-                max="40"
-                step="0.1"
-                inputmode="decimal"
-                aria-label="Air temperature in Celsius"
-              >
-              <span>°C</span>
-            </label>
-            <div id="chartStatus" class="chart-status" role="status"></div>
+            <div class="chart-summary-row">
+              <label class="switch-control graph-incidence-control">
+                <input id="randomIncidence" type="checkbox">
+                <span class="switch-track" aria-hidden="true"></span>
+                <span>Random incidence</span>
+              </label>
+              <div id="chartStatus" class="chart-status" role="status"></div>
+            </div>
+            <div class="temperature-control">
+              <label class="temperature-field" for="airTemperature">
+                <span>Temperature</span>
+                <input
+                  id="airTemperature"
+                  type="number"
+                  min="-20"
+                  max="40"
+                  step="1"
+                  inputmode="numeric"
+                  aria-label="Air temperature in Celsius"
+                >
+                <span>°C</span>
+              </label>
+              <button id="resetAirTemperatureButton" class="quiet-button" type="button">Reset</button>
+            </div>
           </div>
         </section>
 
