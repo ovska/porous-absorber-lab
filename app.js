@@ -97,10 +97,10 @@ const CHART_FREQUENCY_TICK_TEXT = [
 const ROOM_MODE_FREQUENCY_MAX = 20000;
 
 const ROOM_DIMENSION_RANGE = {
-  min: 200,
+  min: 0,
   max: 500,
   step: 1,
-  fallback: 300,
+  fallback: 0,
 };
 
 const ROOM_DIMENSIONS = {
@@ -201,7 +201,6 @@ function cacheElements() {
   els.optimizeFrequencyInput = document.querySelector("#optimizeFrequencyInput");
   els.optimizerLineVisible = document.querySelector("#optimizerLineVisible");
   els.optimizeButtons = document.querySelectorAll("[data-optimize-param]");
-  els.roomModesPanel = document.querySelector("#roomModesPanel");
   els.roomModeOrder = document.querySelector("#roomModeOrder");
   els.roomDimensionList = document.querySelector("#roomDimensionList");
   els.absorberList = document.querySelector("#absorberList");
@@ -549,10 +548,6 @@ function syncStaticControls() {
   els.optimizeFrequencyInput.value = Math.round(state.optimizeFrequency);
   els.optimizerLineVisible.checked = state.showOptimizerLine;
   els.roomModeOrder.value = String(state.roomModes.order);
-  const roomModesEnabled = state.roomModes.order > 0;
-  els.roomModesPanel.dataset.roomModesEnabled = String(roomModesEnabled);
-  els.roomDimensionList.hidden = !roomModesEnabled;
-  els.roomDimensionList.setAttribute("aria-hidden", String(!roomModesEnabled));
 }
 
 function syncTheme() {
@@ -622,6 +617,7 @@ function commitAirTemperatureInput() {
   state.airTemperatureC = nextTemperature;
   saveState();
   syncStaticControls();
+  renderRoomDimensionList();
   renderChart();
 }
 
@@ -728,6 +724,9 @@ function renderRoomDimensionList() {
               aria-label="${meta.label} room dimension value in centimeters"
             >
           </span>
+          <div class="room-harmonic-buttons" data-room-harmonics="${key}">
+            ${renderRoomHarmonicButtons(value)}
+          </div>
         </div>
       `;
     })
@@ -740,6 +739,10 @@ function renderRoomDimensionList() {
   els.roomDimensionList
     .querySelectorAll("[data-room-action]")
     .forEach((input) => bindRoomDimensionControl(input));
+
+  els.roomDimensionList
+    .querySelectorAll("[data-room-harmonic-frequency]")
+    .forEach((button) => bindRoomHarmonicButton(button));
 }
 
 function bindRoomDimensionToggle(button) {
@@ -760,6 +763,7 @@ function bindRoomDimensionControl(input) {
       state.roomModes.dimensions[dimension] = value;
       saveState();
       syncRoomDimensionControl(dimension, value);
+      syncRoomHarmonicButtons(dimension);
       renderChart();
     });
     return;
@@ -771,8 +775,25 @@ function bindRoomDimensionControl(input) {
     state.roomModes.dimensions[dimension] = value;
     saveState();
     syncRoomDimensionControl(dimension, value);
+    syncRoomHarmonicButtons(dimension);
     renderChart();
   });
+}
+
+function bindRoomHarmonicButton(button) {
+  button.addEventListener("click", () => {
+    const frequency = Number(button.dataset.roomHarmonicFrequency);
+    if (!Number.isFinite(frequency)) return;
+    setOptimizerFrequencyFromRoomMode(frequency);
+  });
+}
+
+function setOptimizerFrequencyFromRoomMode(frequency) {
+  state.showOptimizerLine = true;
+  state.optimizeFrequency = clampFrequency(frequency);
+  saveState();
+  syncStaticControls();
+  renderChart();
 }
 
 function syncRoomDimensionVisibility(dimension) {
@@ -795,6 +816,36 @@ function syncRoomDimensionControl(dimension, value) {
       input.value = value ?? "";
     }
   });
+}
+
+function syncRoomHarmonicButtons(dimension) {
+  const container = els.roomDimensionList.querySelector(`[data-room-harmonics="${dimension}"]`);
+  if (!container) return;
+
+  container.innerHTML = renderRoomHarmonicButtons(state.roomModes.dimensions[dimension]);
+  container
+    .querySelectorAll("[data-room-harmonic-frequency]")
+    .forEach((button) => bindRoomHarmonicButton(button));
+}
+
+function renderRoomHarmonicButtons(lengthCentimeters) {
+  if (!lengthCentimeters) return "";
+
+  const air = airProperties();
+  return Array.from({ length: 3 }, (_, index) => {
+    const order = index + 1;
+    const frequency = roomModeFrequency(lengthCentimeters, order, air);
+    if (!Number.isFinite(frequency)) return "";
+    const label = Math.round(frequency);
+    return `
+      <button
+        class="quiet-button room-harmonic-button"
+        type="button"
+        data-room-harmonic-frequency="${frequency}"
+        title="Set optimizer to ${label} Hz"
+      >${label}</button>
+    `;
+  }).join("");
 }
 
 function renderAbsorberCard(absorber, index) {
@@ -1314,7 +1365,8 @@ function normalizeRoomDimension(value, migrateMillimeters = false) {
 
 function roomValueFromControl(input) {
   if (input.dataset.roomAction === "range") {
-    return roomSliderValue(input.value);
+    const value = roomSliderValue(input.value);
+    return value > 0 ? value : null;
   }
 
   return normalizeRoomDimension(input.value);

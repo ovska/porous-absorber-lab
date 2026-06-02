@@ -226,10 +226,6 @@ h1 {
   box-shadow: var(--soft-shadow);
 }
 
-.room-modes-panel[data-room-modes-enabled="false"] {
-  grid-template-columns: 230px;
-}
-
 .room-mode-select label {
   display: grid;
   gap: 8px;
@@ -245,10 +241,6 @@ h1 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-}
-
-.room-dimension-list[hidden] {
-  display: none;
 }
 
 .room-dimension-field {
@@ -295,6 +287,19 @@ h1 {
   grid-template-columns: minmax(0, 1fr) 112px;
   gap: 10px;
   align-items: center;
+}
+
+.room-harmonic-buttons {
+  min-height: 30px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.room-harmonic-button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.82rem;
 }
 
 select,
