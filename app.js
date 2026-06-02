@@ -724,8 +724,10 @@ function renderRoomDimensionList() {
               aria-label="${meta.label} room dimension value in centimeters"
             >
           </span>
-          <div class="room-harmonic-buttons" data-room-harmonics="${key}">
-            ${renderRoomHarmonicButtons(value)}
+          <div class="room-harmonic-row">
+            <div class="room-harmonic-buttons" data-room-harmonics="${key}">
+              ${renderRoomHarmonicButtons(value)}
+            </div>
           </div>
         </div>
       `;
@@ -829,20 +831,23 @@ function syncRoomHarmonicButtons(dimension) {
 }
 
 function renderRoomHarmonicButtons(lengthCentimeters) {
-  if (!lengthCentimeters) return "";
-
   const air = airProperties();
   return Array.from({ length: 3 }, (_, index) => {
     const order = index + 1;
-    const frequency = roomModeFrequency(lengthCentimeters, order, air);
-    if (!Number.isFinite(frequency)) return "";
-    const label = Math.round(frequency);
+    const frequency = lengthCentimeters
+      ? roomModeFrequency(lengthCentimeters, order, air)
+      : null;
+    const hasFrequency = Number.isFinite(frequency);
+    const label = hasFrequency ? Math.round(frequency) : order;
+    const attributes = hasFrequency
+      ? `data-room-harmonic-frequency="${frequency}" title="Set optimizer to ${label} Hz"`
+      : 'disabled aria-hidden="true" tabindex="-1"';
+
     return `
       <button
-        class="quiet-button room-harmonic-button"
+        class="quiet-button room-harmonic-button${hasFrequency ? "" : " is-hidden"}"
         type="button"
-        data-room-harmonic-frequency="${frequency}"
-        title="Set optimizer to ${label} Hz"
+        ${attributes}
       >${label}</button>
     `;
   }).join("");
