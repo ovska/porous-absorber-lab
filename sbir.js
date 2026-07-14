@@ -24,6 +24,10 @@ const PARAMS = {
     defaultValue: 0,
     unit: "mm",
   },
+  listenerDistance: {
+    defaultValue: 2500,
+    unit: "mm",
+  },
   highPassFrequency: {
     defaultValue: 50,
     unit: "Hz",
@@ -141,6 +145,7 @@ function createDefaultState() {
   return {
     cabinetDepth: PARAMS.cabinetDepth.defaultValue,
     rearDistance: PARAMS.rearDistance.defaultValue,
+    listenerDistance: PARAMS.listenerDistance.defaultValue,
     highPassFrequency: PARAMS.highPassFrequency.defaultValue,
     flowResistivity: PARAMS.flowResistivity.defaultValue,
     absorberDepth: PARAMS.absorberDepth.defaultValue,
@@ -313,16 +318,17 @@ function renderChart() {
         result.reflectionDb,
         result.absorptionPercent,
         result.highPassDb,
+        result.spreadingLossDb,
       ]),
       hovertemplate:
-        "<b>Result at listener</b><br>%{x:.0f} Hz<br>%{customdata[0]:.1f} dB<br>reflected component %{customdata[1]:.1f} dB<br>speaker high pass %{customdata[3]:.1f} dB<br>surface absorption %{customdata[2]:.0f}%<extra></extra>",
+        "<b>Result at listener</b><br>%{x:.0f} Hz<br>%{customdata[0]:.1f} dB<br>reflected component %{customdata[1]:.1f} dB<br>path spreading %{customdata[4]:.1f} dB<br>speaker high pass %{customdata[3]:.1f} dB<br>surface absorption %{customdata[2]:.0f}%<extra></extra>",
     },
     {
       x: frequencies,
       y: results.map((result) => displayDb(result.reflectionDb)),
       type: "scatter",
       mode: "lines",
-      name: "Back-wall reflection",
+      name: "Reflection at listener",
       line: {
         color: theme.reflection,
         width: 2,
@@ -333,9 +339,10 @@ function renderChart() {
         result.surfaceReflectionDb,
         result.absorptionPercent,
         result.highPassDb,
+        result.spreadingLossDb,
       ]),
       hovertemplate:
-        "<b>Back-wall reflection</b><br>%{x:.0f} Hz<br>%{customdata[0]:.1f} dB<br>surface reflection %{customdata[1]:.1f} dB<br>speaker high pass %{customdata[3]:.1f} dB<br>surface absorption %{customdata[2]:.0f}%<extra></extra>",
+        "<b>Reflection at listener</b><br>%{x:.0f} Hz<br>%{customdata[0]:.1f} dB<br>path spreading %{customdata[4]:.1f} dB<br>surface reflection %{customdata[1]:.1f} dB<br>speaker high pass %{customdata[3]:.1f} dB<br>surface absorption %{customdata[2]:.0f}%<extra></extra>",
     },
     {
       x: nulls.map((entry) => entry.frequency),
@@ -437,9 +444,16 @@ function responseAtFrequency(frequency) {
   const air = airProperties();
   const reflection = surfaceReflectionCoefficient(frequency, air);
   const waveNumber = (2 * Math.PI * frequency) / air.speed;
-  const extraPathPhase = -2 * waveNumber * driverToSurfaceDistance();
+  const wallDistance = driverToSurfaceDistance();
+  const directDistance = state.listenerDistance / 1000;
+  const reflectedDistance = directDistance + 2 * wallDistance;
+  const reflectedToDirectRatio = directDistance / reflectedDistance;
+  const extraPathPhase = -2 * waveNumber * wallDistance;
   const propagation = c(Math.cos(extraPathPhase), Math.sin(extraPathPhase));
-  const reflectedAtListener = cmul(reflection, propagation);
+  const reflectedAtListener = cmul(
+    cmul(reflection, propagation),
+    c(reflectedToDirectRatio),
+  );
   const summedPressure = cadd(c(1), reflectedAtListener);
   const reflectionMagnitude = cabs(reflection);
   const highPassMagnitude = speakerHighPassMagnitude(frequency);
@@ -450,8 +464,11 @@ function responseAtFrequency(frequency) {
     interferenceMagnitude,
     responseMagnitude: highPassMagnitude * interferenceMagnitude,
     responseDb: amplitudeToDb(highPassMagnitude * interferenceMagnitude),
-    reflectionDb: amplitudeToDb(highPassMagnitude * reflectionMagnitude),
+    reflectionDb: amplitudeToDb(
+      highPassMagnitude * reflectedToDirectRatio * reflectionMagnitude,
+    ),
     surfaceReflectionDb: amplitudeToDb(reflectionMagnitude),
+    spreadingLossDb: amplitudeToDb(reflectedToDirectRatio),
     highPassDb,
     absorptionPercent: 100 * clamp01(1 - reflectionMagnitude ** 2),
   };
