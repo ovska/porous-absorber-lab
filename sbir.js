@@ -267,8 +267,9 @@ function syncControls() {
   els.absorberDepth.disabled = !state.absorptionEnabled;
   els.airGap.disabled = !state.absorptionEnabled;
   els.absorptionCard.dataset.enabled = String(state.absorptionEnabled);
+  const reflectionSurface = state.absorptionEnabled ? "absorber face" : "front wall";
   els.driverDistance.textContent =
-    `${formatDistance(driverToSurfaceDistance())} driver to absorber face`;
+    `${formatDistance(driverToSurfaceDistance())} driver to ${reflectionSurface}`;
   els.listenerWallDistance.textContent =
     `Listener ${formatDistance(listenerToFrontWallDistance())} from front wall`;
 }
