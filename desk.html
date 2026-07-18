@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Desk-bounce predictor</title>
+  <link rel="stylesheet" href="desk.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Nearfield reflection lab</p>
+      <h1>Desk-bounce predictor</h1>
+    </div>
+    <div class="top-actions">
+      <label>Preset
+        <select id="preset">
+          <option value="reference">Reference</option>
+          <option value="lowered">Lowered</option>
+          <option value="raised">Raised</option>
+          <option value="ear">Ear-height</option>
+        </select>
+      </label>
+      <button id="freeze" type="button">Freeze A/B trace</button>
+      <button id="reset" type="button" class="quiet">Reset</button>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <aside class="controls" aria-label="Model controls">
+      <section>
+        <h2>Model</h2>
+        <div class="segmented" id="modelChoice" role="group" aria-label="Reflection model">
+          <button type="button" data-model="specular">Specular</button>
+          <button type="button" data-model="fresnel">Fresnel</button>
+          <button type="button" data-model="kirchhoff" class="active">Kirchhoff</button>
+        </div>
+        <div class="control-row">
+          <label for="directivity">Source</label>
+          <select id="directivity"><option value="piston">Piston</option><option value="omni">Omni</option></select>
+        </div>
+        <div class="control-row">
+          <label for="smoothing">Smoothing</label>
+          <select id="smoothing"><option value="0">None</option><option value="24">1/24 oct</option><option value="6">1/6 oct</option><option value="3">1/3 oct</option></select>
+        </div>
+        <div class="control-row">
+          <label for="gridStep">Integral grid</label>
+          <select id="gridStep"><option value="0.01">Fine · 1 cm</option><option value="0.02" selected>Balanced · 2 cm</option><option value="0.04">Fast · 4 cm</option></select>
+        </div>
+        <p id="qualityNote" class="microcopy"></p>
+      </section>
+
+      <section>
+        <h2>Geometry</h2>
+        <div id="geometryControls"></div>
+      </section>
+
+      <section>
+        <h2>Surface &amp; source</h2>
+        <label class="check"><input id="absorber_on" type="checkbox"> Absorber patch</label>
+        <div id="absorberControls" class="subcontrols"></div>
+        <div id="sourceControls"></div>
+        <label class="check"><input id="two_way" type="checkbox"> Two-way vertical lobing</label>
+        <label class="check"><input id="coaxial" type="checkbox"> Coaxial drivers</label>
+        <div id="twoWayControls" class="subcontrols"></div>
+      </section>
+
+      <section>
+        <h2>Analysis</h2>
+        <div id="analysisControls"></div>
+      </section>
+    </aside>
+
+    <div class="workspace">
+      <section class="headline" aria-label="Key results">
+        <div><span>Bounce</span><strong id="bounceReadout">—</strong></div>
+        <div><span>Path difference</span><strong id="deltaReadout">—</strong></div>
+        <div><span>First notch</span><strong id="notchReadout">—</strong></div>
+        <div><span>Grazing</span><strong id="grazingReadout">—</strong></div>
+        <div><span>Comb swing</span><strong id="combReadout">—</strong></div>
+      </section>
+      <p id="status" class="status" role="status"></p>
+
+      <section class="geometry-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Geometry</p><h2>Where the reflection forms</h2></div>
+          <div class="frequency-control">
+            <label for="viz_frequency">Fresnel frequency <output id="viz_frequency_out">1.00 kHz</output></label>
+            <input id="viz_frequency" type="range" min="2" max="3.699" step="0.001" value="3">
+          </div>
+        </div>
+        <div class="views">
+          <figure><canvas id="planCanvas" aria-label="Plan view of listener, speakers, desk and Fresnel zone"></canvas><figcaption>Plan · x–y</figcaption></figure>
+          <figure><canvas id="elevationCanvas" aria-label="Elevation view of direct and reflected paths"></canvas><figcaption>Elevation · y–z</figcaption></figure>
+        </div>
+      </section>
+
+      <section class="plots">
+        <figure class="plot-wide"><div class="plot-title"><h2>Frequency response</h2><span>|H(f)| · dB</span></div><canvas id="responsePlot"></canvas></figure>
+        <figure><div class="plot-title"><h2>Fresnel coverage</h2><span>&kappa;(f) · %</span></div><canvas id="coveragePlot"></canvas></figure>
+        <figure><div class="plot-title"><h2>Non-minimum-phase delay</h2><span>excess GD · ms</span></div><canvas id="gdPlot"></canvas></figure>
+        <figure><div class="plot-title"><h2>Energy-time curve</h2><span>envelope · dB vs ms</span></div><canvas id="etcPlot"></canvas></figure>
+        <figure id="polarFigure"><div class="plot-title"><h2>Vertical crossover response</h2><span>relative dB</span></div><canvas id="polarPlot"></canvas></figure>
+      </section>
+
+      <section class="sweep-panel">
+        <div class="panel-heading"><div><p class="eyebrow">Explore</p><h2>Placement sweep</h2></div><button id="runSweep" type="button">Run sweep</button></div>
+        <div class="sweep-controls">
+          <label>X axis<select id="sweepX"><option value="D">Listening distance</option><option value="h_woofer">Woofer height</option><option value="h_ear">Ear height</option><option value="theta">Triangle half-angle</option></select></label>
+          <label>From<input id="sweepXMin" type="number" value="90"></label>
+          <label>To<input id="sweepXMax" type="number" value="160"></label>
+          <label>Y axis<select id="sweepY"><option value="h_woofer">Woofer height</option><option value="D">Listening distance</option><option value="theta">Triangle half-angle</option><option value="none">None</option></select></label>
+          <label>From<input id="sweepYMin" type="number" value="0"></label>
+          <label>To<input id="sweepYMax" type="number" value="60"></label>
+        </div>
+        <p class="microcopy">Sweep ranking uses the fast Fresnel model so the grid stays interactive. Click a cell to load it.</p>
+        <div class="sweep-results">
+          <canvas id="heatmap" aria-label="Comb-depth placement heatmap"></canvas>
+          <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Configuration</th><th>Comb</th><th>Excess GD</th></tr></thead><tbody id="ranking"></tbody></table></div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <footer>Free field + one finite desktop reflector · dimensions are relative to the desktop plane.</footer>
+
+  <script src="geometry.js"></script>
+  <script src="materials.js"></script>
+  <script src="models.js"></script>
+  <script src="viz.js"></script>
+  <script src="plots.js"></script>
+  <script src="desk-app.js"></script>
+</body>
+</html>
