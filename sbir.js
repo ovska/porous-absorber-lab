@@ -9,10 +9,10 @@ const AIR = {
 
 const CHART = {
   minFrequency: 20,
-  maxFrequency: 5000,
+  maxFrequency: 2000,
   samples: 1400,
-  minDb: -36,
-  maxDb: 8,
+  minDb: -24,
+  maxDb: 6,
 };
 
 const PARAMS = {
@@ -46,8 +46,8 @@ const PARAMS = {
   },
 };
 
-const FREQUENCY_TICKS = [20, 31.5, 63, 125, 250, 500, 1000, 2000, 4000, 5000];
-const FREQUENCY_TICK_TEXT = ["20", "31.5", "63", "125", "250", "500", "1k", "2k", "4k", "5k"];
+const FREQUENCY_TICKS = [20, 31.5, 63, 125, 250, 500, 1000, 2000];
+const FREQUENCY_TICK_TEXT = ["20", "31.5", "63", "125", "250", "500", "1k", "2k"];
 
 let state = loadState();
 let plotReady = false;
@@ -388,7 +388,7 @@ function renderChart() {
 
   els.chartStatus.textContent = nulls.length
     ? `Modeled nulls: ${nulls.map((entry) => formatFrequency(entry.frequency)).join(" · ")}`
-    : "No modeled SBIR nulls between 20 Hz and 5 kHz.";
+    : "No modeled SBIR nulls between 20 Hz and 2 kHz.";
 }
 
 function chartLayout(theme) {
@@ -416,10 +416,10 @@ function chartLayout(theme) {
       type: "log",
       range: [Math.log10(CHART.minFrequency), Math.log10(CHART.maxFrequency)],
       tickvals: compactTicks
-        ? [20, 63, 125, 250, 500, 1000, 2000, 5000]
+        ? [20, 63, 125, 250, 500, 1000, 2000]
         : FREQUENCY_TICKS,
       ticktext: compactTicks
-        ? ["20", "63", "125", "250", "500", "1k", "2k", "5k"]
+        ? ["20", "63", "125", "250", "500", "1k", "2k"]
         : FREQUENCY_TICK_TEXT,
       gridcolor: theme.grid,
       zeroline: false,
