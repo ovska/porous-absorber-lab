@@ -3,7 +3,7 @@
    never the y/forward component (which is D cos theta). */
 (function(){
   'use strict';const P=window.DeskPhysics,{geometry:G,models:M,viz:V,plots:Plots}=P;
-  const defaults={model:'kirchhoff',h_ear:48,h_woofer:29.5,tweeter_offset:20,D:120,theta:30,tilt:0,desk_near:30,desk_far:70,desk_width:160,absorber_on:false,absorber_near:30,absorber_far:64,absorber_thickness:4,absorber_sigma:10000,c:343,rigid_R:.97,piston_radius:6.5,directivity:'piston',gridStep:.02,smoothing:0,two_way:false,coaxial:false,crossover:2000,crossover_order:4,band_lo:300,band_hi:3000,viz_auto:false};
+  const defaults={model:'kirchhoff',h_ear:48,h_woofer:29.5,tweeter_offset:20,D:120,theta:30,tilt:0,desk_near:30,desk_far:70,desk_width:160,absorber_on:false,absorber_near:30,absorber_far:64,absorber_thickness:4,absorber_sigma:10000,c:343,rigid_R:.97,piston_radius:6.5,directivity:'piston',gridStep:.02,smoothing:0,two_way:false,coaxial:false,crossover:2000,crossover_order:4,band_lo:300,band_hi:3000,viz_auto:true};
   let state={...defaults},result=null,timeResult=null,ghost=null,pending=0,sweepResult=null,computeTimer=null,exactTimer=null;
   const $=id=>document.getElementById(id), fmt=(v,n=1)=>Number(v).toFixed(n), debounce=(fn,ms)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}};
   const specs={
