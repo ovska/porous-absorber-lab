@@ -6,6 +6,12 @@
   function colors(){const q=getComputedStyle(document.documentElement);return {bg:q.getPropertyValue('--bg').trim(),panel:q.getPropertyValue('--panel').trim(),line:q.getPropertyValue('--line').trim(),text:q.getPropertyValue('--text').trim(),muted:q.getPropertyValue('--muted').trim(),cyan:q.getPropertyValue('--cyan').trim(),amber:q.getPropertyValue('--amber').trim(),blue:q.getPropertyValue('--blue').trim(),purple:q.getPropertyValue('--purple').trim(),red:q.getPropertyValue('--red').trim()};}
   function mix(a,b,t){const hex=x=>{const s=x.trim().replace('#','');if(s.length!==6)return [80,160,160];return [0,2,4].map(i=>parseInt(s.slice(i,i+2),16))},A=hex(a),B=hex(b),v=A.map((x,i)=>Math.round(x+(B[i]-x)*t));return `rgb(${v[0]},${v[1]},${v[2]})`}
   function nice(v){if(Math.abs(v)>=1000)return `${(v/1000).toFixed(v>=10000?0:1)}k`;if(Math.abs(v)<1&&v!==0)return v.toFixed(2);return v.toFixed(Math.abs(v)<10?1:0)}
+  function positiveCeiling(series,xmin=-Infinity,xmax=Infinity){
+    let peak=0;for(const s of series)if(s?.x&&s?.y)for(let i=0;i<s.y.length;i++)if(s.x[i]>=xmin&&s.x[i]<=xmax&&Number.isFinite(s.y[i]))peak=Math.max(peak,s.y[i]);
+    if(!(peak>0))return .1;
+    const raw=peak/5,pow=Math.pow(10,Math.floor(Math.log10(raw))),scaled=raw/pow,step=(scaled<=1?1:scaled<=2?2:scaled<=5?5:10)*pow;
+    return Math.ceil(peak*(1+1e-12)/step)*step;
+  }
   function chart(canvas,series,opt={}){
     const {c,w,h}=setup(canvas),C=colors(),p={l:48,r:14,t:10,b:28};c.clearRect(0,0,w,h);
     const all=series.filter(x=>x&&x.x&&x.x.length),xmin=opt.xmin??Math.min(...all.map(s=>s.x[0])),xmax=opt.xmax??Math.max(...all.map(s=>s.x[s.x.length-1]));let ymin=opt.ymin,ymax=opt.ymax;if(ymin==null||ymax==null){let lo=Infinity,hi=-Infinity;for(const s of all)for(let i=0;i<s.y.length;i++)if(s.x[i]>=xmin&&s.x[i]<=xmax&&Number.isFinite(s.y[i])){lo=Math.min(lo,s.y[i]);hi=Math.max(hi,s.y[i]);}const m=Math.max(1,(hi-lo)*.08);ymin=ymin??lo-m;ymax=ymax??hi+m;}
@@ -20,5 +26,5 @@
   }
   function polar(canvas,data){const {c,w,h}=setup(canvas),C=colors();c.clearRect(0,0,w,h);const cx=w/2,cy=h-22,r=Math.min(w*.43,h*.77);c.strokeStyle=C.line;c.fillStyle=C.muted;c.font='10px system-ui';for(const db of [0,-6,-12,-18,-24]){const rr=r*(1+db/30);c.beginPath();c.arc(cx,cy,rr,Math.PI,2*Math.PI);c.stroke();c.fillText(`${db}`,cx+3,cy-rr+11)}for(const a of [-60,-30,0,30,60]){const t=(a-90)*Math.PI/180;line(cx,cy,cx+r*Math.cos(t),cy+r*Math.sin(t));c.fillText(`${a}°`,cx+r*Math.cos(t)-8,cy+r*Math.sin(t)-3)}c.strokeStyle=C.purple;c.lineWidth=2;c.beginPath();for(let i=0;i<data.angles.length;i++){const t=(data.angles[i]-90)*Math.PI/180,rr=r*Math.max(0,1+Math.max(-30,data.db[i])/30),x=cx+rr*Math.cos(t),y=cy+rr*Math.sin(t);i?c.lineTo(x,y):c.moveTo(x,y)}c.stroke();function line(x1,y1,x2,y2){c.beginPath();c.moveTo(x1,y1);c.lineTo(x2,y2);c.stroke()}}
   function heatmap(canvas,result,onPick){const {c,w,h}=setup(canvas),C=colors(),p={l:52,r:14,t:14,b:36},cols=result.xs.length,rows=result.ys.length,cw=(w-p.l-p.r)/cols,ch=(h-p.t-p.b)/rows,min=result.min,max=result.max;c.clearRect(0,0,w,h);for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const v=result.values[j*cols+i],t=(v-min)/(max-min||1);c.fillStyle=mix(C.cyan,C.red,t);c.fillRect(p.l+i*cw,p.t+(rows-1-j)*ch,cw+.5,ch+.5)}c.fillStyle=C.muted;c.font='10px system-ui';for(let i=0;i<cols;i+=Math.max(1,Math.floor(cols/5))){const x=p.l+(i+.5)*cw;c.fillText(nice(result.xs[i]),x-9,h-12)}for(let j=0;j<rows;j+=Math.max(1,Math.floor(rows/5))){const y=p.t+(rows-j-.5)*ch;c.fillText(nice(result.ys[j]),4,y+3)}c.fillText(result.xLabel,p.l,h-1);c.save();c.translate(10,h/2+20);c.rotate(-Math.PI/2);c.fillText(result.yLabel,0,0);c.restore();canvas.onclick=e=>{const r=canvas.getBoundingClientRect(),i=Math.floor((e.clientX-r.left-p.l)/cw),jj=Math.floor((e.clientY-r.top-p.t)/ch),j=rows-1-jj;if(i>=0&&i<cols&&j>=0&&j<rows)onPick(i,j)}}
-  ns.plots={chart,polar,heatmap,colors};
+  ns.plots={chart,polar,heatmap,colors,positiveCeiling};
 })(window);

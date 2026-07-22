@@ -126,7 +126,10 @@
     const cepR=new Float64Array(lm),cepI=new Float64Array(N);fft(cepR,cepI,true);
     for(let i=1;i<N/2;i++)cepR[i]*=2;for(let i=N/2+1;i<N;i++)cepR[i]=0;cepI.fill(0);fft(cepR,cepI,false);
     const totalP=unwrap(Array.from({length:one},(_,i)=>Math.atan2(ev.him[i],ev.hre[i]))),minP=unwrap(cepI.slice(0,one));
-    const gdF=[],gd=[];for(let i=2;i<one-2;i++){const domega=2*Math.PI*(f[i+1]-f[i-1]);const gt=-(totalP[i+1]-totalP[i-1])/domega,gm=-(minP[i+1]-minP[i-1])/domega;gdF.push(f[i]);gd.push((gt-gm)*1000);}
+    const gdF=[],gd=[];for(let i=2;i<one-2;i++){const domega=2*Math.PI*(f[i+1]-f[i-1]);const gt=-(totalP[i+1]-totalP[i-1])/domega,gm=-(minP[i+1]-minP[i-1])/domega;gdF.push(f[i]);
+      // For a causal stable response, H/H_min is all-pass and its group delay is
+      // non-negative. Small negative residues come only from finite-FFT/Hilbert error.
+      gd.push(Math.max(0,(gt-gm)*1000));}
     const irR=new Float64Array(hr),irI=new Float64Array(hi);fft(irR,irI,true);
     const ar=new Float64Array(irR),ai=new Float64Array(N);fft(ar,ai,false);for(let i=1;i<N/2;i++){ar[i]*=2;ai[i]*=2;}for(let i=N/2+1;i<N;i++){ar[i]=0;ai[i]=0;}fft(ar,ai,true);
     const time=[],etc=[];let peak=1e-12;for(let i=0;i<N;i++)peak=Math.max(peak,Math.hypot(ar[i],ai[i]));for(let i=0;i<Math.min(N,Math.round(.05*sampleRate));i++){time.push(i/sampleRate*1000);etc.push(20*Math.log10(Math.max(1e-8,Math.hypot(ar[i],ai[i])/peak)));}
