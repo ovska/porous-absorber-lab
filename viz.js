@@ -18,7 +18,7 @@
     grid(c,w,h,to,{x0:-extX,x1:extX,y0:yMin,y1:yMax},C);
     const r0=to(g.rect.x0,g.rect.y0),r1=to(g.rect.x1,g.rect.y1);c.fillStyle=C.line;c.globalAlpha=.45;c.fillRect(r0.x,r1.y,r1.x-r0.x,r0.y-r1.y);c.globalAlpha=1;c.strokeStyle=C.muted;c.strokeRect(r0.x,r1.y,r1.x-r0.x,r0.y-r1.y);
     if(s.absorber_on){const a0=to(g.rect.x0,s.absorber_near*.01),a1=to(g.rect.x1,s.absorber_far*.01);c.fillStyle=C.purple;c.globalAlpha=.3;c.fillRect(a0.x,a1.y,a1.x-a0.x,a0.y-a1.y);c.globalAlpha=1;}
-    const ep=to(e.cx,e.cy);c.save();c.translate(ep.x,ep.y);c.rotate(-e.angle);for(const [n,a] of [[3,.12],[2,.18],[1,.32]]){c.beginPath();c.ellipse(0,0,e.major*scale*n,e.minor*scale*n,0,0,Math.PI*2);c.strokeStyle=C.cyan;c.globalAlpha=a;c.lineWidth=n===1?1.5:1;c.stroke()}c.restore();c.globalAlpha=1;
+    const ep=to(e.cx,e.cy);c.save();c.translate(ep.x,ep.y);c.rotate(-e.angle);for(const [n,a] of [[3,.12],[2,.18],[1,.32]]){const radiusScale=Math.sqrt(n);c.beginPath();c.ellipse(0,0,e.major*scale*radiusScale,e.minor*scale*radiusScale,0,0,Math.PI*2);c.strokeStyle=C.cyan;c.globalAlpha=a;c.lineWidth=n===1?1.5:1;c.stroke()}c.restore();c.globalAlpha=1;
     // Shade the exact visible desk/ellipse overlap. This uses the same ellipse geometry as coverage().
     c.save();c.beginPath();c.ellipse(ep.x,ep.y,e.major*scale,e.minor*scale,-e.angle,0,Math.PI*2);c.clip();c.globalAlpha=.18;c.fillStyle=C.cyan;c.fillRect(r0.x,r1.y,r1.x-r0.x,r0.y-r1.y);c.restore();
     const ear=to(0,0),sp=to(g.speaker.x,g.speaker.y),sm=to(-g.speaker.x,g.speaker.y),bp=to(g.bounce.x,g.bounce.y);

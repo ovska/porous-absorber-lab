@@ -84,7 +84,7 @@
 
       <section class="geometry-panel">
         <div class="panel-heading">
-          <div><p class="eyebrow">Geometry</p><h2>Where the reflection forms</h2></div>
+          <div><p class="eyebrow">Geometry</p><div class="title-with-info"><h2>Where the reflection forms</h2><span class="info-tip"><button class="info-button" type="button" aria-label="About the Fresnel zones" aria-describedby="tip-fresnel-zones">i</button><span class="info-tooltip" id="tip-fresnel-zones" role="tooltip">The oval is the first Fresnel zone: the desktop area whose reflected sound arrives roughly in phase at this frequency. More overlap with the desk generally means a stronger reflection. The zone grows at low frequencies, shrinks at high frequencies, and the faint outer rings show later zones whose alternating phase makes edges and absorber placement matter.</span></span></div></div>
           <div class="frequency-control">
             <div class="frequency-header">
               <label for="viz_frequency">Fresnel frequency <output id="viz_frequency_out">1.00 kHz</output></label>
@@ -100,15 +100,15 @@
       </section>
 
       <section class="plots">
-        <figure class="plot-wide"><div class="plot-title"><h2>Frequency response</h2><span>|H(f)| · dB</span></div><canvas id="responsePlot"></canvas></figure>
-        <figure><div class="plot-title"><h2>Fresnel coverage</h2><span>&kappa;(f) · %</span></div><canvas id="coveragePlot"></canvas></figure>
-        <figure><div class="plot-title"><h2>Non-minimum-phase delay</h2><span>excess GD · ms</span></div><canvas id="gdPlot"></canvas></figure>
-        <figure><div class="plot-title"><h2>Energy-time curve</h2><span>envelope · dB vs ms</span></div><canvas id="etcPlot"></canvas></figure>
+        <figure class="plot-wide"><div class="plot-title"><div class="title-with-info"><h2>Frequency response</h2><span class="info-tip"><button class="info-button" type="button" aria-label="About the frequency response" aria-describedby="tip-response">i</button><span class="info-tooltip" id="tip-response" role="tooltip">A simplified free-field prediction of only the direct speaker sound plus its first desktop reflection. Dips and peaks show desk-bounce interference; room modes, walls, floor, ceiling, furniture and loudspeaker response are deliberately excluded.</span></span></div><span>|H(f)| · dB</span></div><canvas id="responsePlot"></canvas></figure>
+        <figure><div class="plot-title"><div class="title-with-info"><h2>Fresnel coverage</h2><span class="info-tip"><button class="info-button" type="button" aria-label="About Fresnel coverage" aria-describedby="tip-coverage">i</button><span class="info-tooltip" id="tip-coverage" role="tooltip">The percentage of the first Fresnel zone covered by reflective desktop at each frequency. A larger value means the desk behaves more like a complete reflector; uncovered area and the absorber patch reduce the coherent reflected contribution.</span></span></div><span>&kappa;(f) · %</span></div><canvas id="coveragePlot"></canvas></figure>
+        <figure><div class="plot-title"><div class="title-with-info"><h2>Non-minimum-phase delay</h2><span class="info-tip"><button class="info-button" type="button" aria-label="About excess group delay" aria-describedby="tip-delay">i</button><span class="info-tooltip" id="tip-delay" role="tooltip">The delay left after subtracting the minimum-phase response implied by the magnitude curve. It highlights reflection-related timing that ordinary magnitude EQ cannot remove; larger peaks indicate stronger time-domain ringing or smear.</span></span></div><span>excess GD · ms</span></div><canvas id="gdPlot"></canvas></figure>
+        <figure><div class="plot-title"><div class="title-with-info"><h2>Energy-time curve</h2><span class="info-tip"><button class="info-button" type="button" aria-label="About the energy-time curve" aria-describedby="tip-etc">i</button><span class="info-tooltip" id="tip-etc" role="tooltip">A time-domain view of the predicted impulse response. The main arrival is the direct sound; later energy shows the desktop reflection and its finite-edge spread. The envelope is normalized to its strongest arrival.</span></span></div><span>envelope · dB vs ms</span></div><canvas id="etcPlot"></canvas></figure>
         <figure id="polarFigure"><div class="plot-title"><h2>Vertical crossover response</h2><span>relative dB</span></div><canvas id="polarPlot"></canvas></figure>
       </section>
 
       <section class="sweep-panel">
-        <div class="panel-heading"><div><p class="eyebrow">Explore</p><h2>Placement sweep</h2></div><button id="runSweep" type="button">Run sweep</button></div>
+        <div class="panel-heading"><div><p class="eyebrow">Explore</p><div class="title-with-info"><h2>Placement sweep</h2><span class="info-tip"><button class="info-button" type="button" aria-label="About the placement sweep" aria-describedby="tip-sweep">i</button><span class="info-tooltip" id="tip-sweep" role="tooltip">The heatmap varies the selected placement dimensions and colors each cell by predicted comb-filter swing in the chosen frequency band. Lower values are better. It uses the fast Fresnel model for exploration; the ranked table also estimates excess delay. Click a cell or row to load that configuration into the full model.</span></span></div></div><button id="runSweep" type="button">Run sweep</button></div>
         <div class="sweep-controls">
           <label>X axis<select id="sweepX"><option value="D">Listening distance</option><option value="h_woofer">Woofer height</option><option value="h_ear">Ear height</option><option value="theta">Triangle half-angle</option></select></label>
           <label>From<input id="sweepXMin" type="number" value="90"></label>
